@@ -98,7 +98,7 @@ wxApplyStyle s = do
       , handle (fillColor brush)
       ]
     -- apply and delete pen and brush
-    --graphicsContextSetPen context pen
+    graphicsContextSetPen context pen
     graphicsContextSetBrush context brush
     brushDelete brush
     penDelete pen
