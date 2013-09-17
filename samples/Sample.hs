@@ -1,7 +1,7 @@
 module Main where
 
-import Graphics.UI.WXCore
-import Graphics.UI.WX hiding (circle)
+import Graphics.UI.WXCore hiding ((#),blue,purple)
+import Graphics.UI.WX hiding (circle,(#),blue,purple)
 import Diagrams.Prelude hiding (start, text)
 import Diagrams.Backend.WX
 import Diagrams.Backend.WX.Internals
@@ -32,4 +32,6 @@ gui = do
     varUpdate dias (\d -> tail d)
     repaint sw
 
-sampleDiagrams = [circle 100, square 10] :: [Diagram WX R2]
+sampleDiagrams = [circle 100
+                 ,circle 100 # lc purple # fc blue
+                 ,square 10] :: [Diagram WX R2]
