@@ -139,12 +139,17 @@ instance Backend WX R2 where
 
   adjustDia c opts d = if optBypassAdjust opts
                          then (opts, transDia # setDefault2DAttributes)
-                         else adjustDia2D (\o -> let (w,h) = optSize o in mkSizeSpec (Just w) (Just h))
-                                          (\_ o -> o)
+                         else adjustDia2D (\o -> let (w,h) = optSize o in mkSizeSpec (Just $ w) (Just $ h))
+                                          setWXSizeWithSizeSpec
                                           c opts d
                           where
                            (optWidth, optHeight) = optSize opts
                            transDia = moveTo (p2 (optWidth/2.0, optHeight/2.0)) d
+                           setWXSizeWithSizeSpec s o = case s of
+                             Absolute -> o
+                             Width w  -> o {optSize = (w,w)}
+                             Height h -> o {optSize = (h,h)}
+                             Dims w h -> o {optSize = (w,h)}
 
 -- Draw a relative line
 graphicsPathAddRelLine :: GraphicsPath a -> (Point2 Double) -> IO ()
