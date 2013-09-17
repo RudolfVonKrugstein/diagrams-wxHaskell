@@ -17,7 +17,7 @@ gui = do
   dias  <- varCreate (concat . repeat $ sampleDiagrams)
   f  <- frame [text := "Diagrams demo"]
   sw <- scrolledWindow f []
-  b  <- button f [ text := "Next", on command := onpress ]
+  b  <- button f [ text := "Next", on command := onpress dias sw ]
   windowOnPaintRaw sw (onpaint sw dias)
   set f [layout := minsize (sz 400 400 ) $ column  2 [fill $ widget sw,hfill $ widget b]]
   return ()
@@ -27,5 +27,8 @@ gui = do
     putStrLn "OnPaint"
     renderToWindow sw False dia
   onpress = return ()
+  onpress dias sw = do
+    varUpdate dias (\d -> tail d)
+    repaint sw
 
 sampleDiagrams = [circle 100] :: [Diagram WX R2]
