@@ -4,7 +4,6 @@ import Graphics.UI.WXCore hiding ((#),blue,purple)
 import Graphics.UI.WX hiding (circle,(#),blue,purple)
 import Diagrams.Prelude hiding (start, text)
 import Diagrams.Backend.WX
-import Diagrams.Backend.WX.Internals
 import Data.Maybe
 
 

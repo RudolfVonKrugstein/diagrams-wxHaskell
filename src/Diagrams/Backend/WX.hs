@@ -1,5 +1,6 @@
 module Diagrams.Backend.WX (
   renderToWindow
+, WX(..)
 ) where
 
 import Graphics.UI.WX
