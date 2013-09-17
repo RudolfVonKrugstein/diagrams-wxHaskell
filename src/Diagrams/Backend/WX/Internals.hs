@@ -145,11 +145,14 @@ instance Backend WX R2 where
     graphicsContextStrokePath (optContext opts) path
     graphicsPathDelete path
 
-  {-adjustDia c opts d = if optBypassAdjust opts
-                         then (opts, d # setDefault2DAttributes)
+  adjustDia c opts d = if optBypassAdjust opts
+                         then (opts, transDia # setDefault2DAttributes)
                          else adjustDia2D (\o -> let (w,h) = optSize o in mkSizeSpec (Just w) (Just h))
                                           (\_ o -> o)
-                                          c opts d-}
+                                          c opts d
+                          where
+                           (optWidth, optHeight) = optSize opts
+                           transDia = moveTo (p2 (optWidth/2.0, optHeight/2.0)) d
 
 -- Draw a relative line
 graphicsPathAddRelLine :: GraphicsPath a -> (Point2 Double) -> IO ()

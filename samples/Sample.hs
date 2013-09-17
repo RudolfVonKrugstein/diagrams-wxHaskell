@@ -25,8 +25,7 @@ gui = do
   onpaint sw dias _ _ _ = do
     dia <- head <$> varGet dias
     putStrLn "OnPaint"
-    renderToWindow sw False dia
-  onpress = return ()
+    renderToWindow sw True dia
   onpress dias sw = do
     varUpdate dias (\d -> tail d)
     repaint sw
