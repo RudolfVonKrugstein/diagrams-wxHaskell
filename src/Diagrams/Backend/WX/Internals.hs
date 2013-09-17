@@ -18,6 +18,9 @@ import Graphics.UI.WXCore (GraphicsPath
                           ,penCreateDefault
                           ,penSetColour
                           ,penDelete
+                          ,penSetWidth
+                          ,penSetJoin
+                          ,penSetCap
                           ,graphicsContextSetPen
                           ,brushCreateDefault
                           ,brushSetColour
@@ -37,6 +40,12 @@ import Graphics.UI.WXCore (GraphicsPath
                           ,graphicsContextCreateMatrix
                           ,graphicsMatrixSet
                           ,graphicsMatrixDelete
+                          ,wxCAP_BUTT
+                          ,wxCAP_ROUND
+                          ,wxCAP_PROJECTING
+                          ,wxJOIN_MITER
+                          ,wxJOIN_ROUND
+                          ,wxJOIN_BEVEL
                           )
 import qualified Graphics.UI.WXCore.WxcTypes as WXT
 import Diagrams.Prelude
@@ -88,6 +97,7 @@ wxApplyStyle s = do
     sequence_ . catMaybes $ [
         handle (lineColor pen)
       , handle (fillColor brush)
+      , handle (lineWidth pen)
       ]
     -- apply and delete pen and brush
     graphicsContextSetPen context pen
@@ -101,7 +111,25 @@ wxApplyStyle s = do
      clip context  = undefined
      lineColor pen   = penSetColour pen     . (colorToWXColor s) <$> getLineColor
      fillColor brush = brushSetColour brush . (colorToWXColor s) <$> getFillColor
-      
+     lineWidth pen   = penSetWidth pen . lineWidthToWXLineWidth <$> getLineWidth
+     lineCap   pen   = penSetCap  pen . lineCapToWXLineCap      <$> getLineCap
+     lineJoin  pen   = penSetJoin pen . lineJoinToWXLineJoin    <$> getLineJoin
+
+-- | wxHaskell pens only take integer width. So we have to round the pen width
+--   to the nearest integer. But we do not want to round number < 0.5 to 0, but to 1
+lineWidthToWXLineWidth :: Double -> Int
+lineWidthToWXLineWidth w | w < 1.0   = 1
+                         | otherwise = round w
+
+lineCapToWXLineCap :: LineCap -> Int
+lineCapToWXLineCap LineCapButt   = wxCAP_BUTT
+lineCapToWXLineCap LineCapRound  = wxCAP_ROUND
+lineCapToWXLineCap LineCapSquare = wxCAP_PROJECTING
+
+lineJoinToWXLineJoin :: LineJoin -> Int
+lineJoinToWXLineJoin LineJoinMiter = wxJOIN_MITER
+lineJoinToWXLineJoin LineJoinRound = wxJOIN_ROUND
+lineJoinToWXLineJoin LineJoinBevel = wxJOIN_BEVEL
 
 instance Backend WX R2 where
   data Render   WX R2 = C (RenderM ())
