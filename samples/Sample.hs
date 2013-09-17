@@ -32,4 +32,4 @@ gui = do
     varUpdate dias (\d -> tail d)
     repaint sw
 
-sampleDiagrams = [circle 100] :: [Diagram WX R2]
+sampleDiagrams = [circle 100, square 10] :: [Diagram WX R2]
