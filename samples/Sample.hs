@@ -18,14 +18,16 @@ gui = do
   f  <- frame [text := "Diagrams demo"]
   sw <- scrolledWindow f []
   b  <- button f [ text := "Next", on command := onpress dias sw ]
-  windowOnPaintRaw sw (onpaint sw dias)
-  set f [layout := minsize (sz 400 400 ) $ column  2 [fill $ widget sw,hfill $ widget b]]
+  cb <- checkBox f [ text := "Bypass adjust dia", on command := repaint sw ]
+  windowOnPaintRaw sw (onpaint sw dias cb)
+  set f [layout := minsize (sz 400 400 ) $ column  2 [fill $ widget sw,hfill $ row 2 [widget b, widget cb]]]
   return ()
  where
-  onpaint sw dias _ _ _ = do
+  onpaint sw dias cb _ _ _ = do
+    bypassAdjustDia <- get cb checked
     dia <- head <$> varGet dias
     putStrLn "OnPaint"
-    renderToWindow sw True dia
+    renderToWindow sw bypassAdjustDia dia
   onpress dias sw = do
     varUpdate dias (\d -> tail d)
     repaint sw
