@@ -76,22 +76,14 @@ colorToWXColor s c = WXT.rgba (round (r * 255.0)) (round (g * 255.0)) (round (b 
                   Nothing -> a
                   Just  d -> d * a
 
--- | Create the default pen and brush, to be used when no style is applied
-wxCreateDefaultPenAndBrush :: IO (Pen (), Brush ())
-wxCreateDefaultPenAndBrush = do
-  pen <- penCreateDefault
-  penSetColour pen (WXT.rgba 0 0 0 255)
-  brush <- brushCreateDefault
-  brushSetColour brush (WXT.rgba 0 0 0 255)
-  return (pen, brush)
-
 -- | Apply all the styles
 wxApplyStyle :: Style v -> RenderM ()
 wxApplyStyle s = do
   context <- graphicsContext <$> ask
   -- create default pen and brush
   liftIO $ do
-    (pen, brush)   <- wxCreateDefaultPenAndBrush
+    pen <- penCreateDefault
+    brush <- brushCreateDefault
     -- apply styles to it
     sequence_ . catMaybes $ [
         handle (lineColor pen)
