@@ -30,7 +30,9 @@ import Graphics.UI.WXCore (GraphicsPath
                           ,graphicsContextPopState
                           ,graphicsContextConcatTransform
                           ,graphicsContextCreatePath
-                          ,graphicsContextStrokePath
+                          ,graphicsContextDrawPath
+                          ,wxODDEVEN_RULE
+                          ,wxWINDING_RULE
                           ,graphicsPathGetCurrentPoint
                           ,graphicsPathAddLineToPoint
                           ,graphicsPathAddCurveToPoint
@@ -131,6 +133,10 @@ lineJoinToWXLineJoin LineJoinMiter = wxJOIN_MITER
 lineJoinToWXLineJoin LineJoinRound = wxJOIN_ROUND
 lineJoinToWXLineJoin LineJoinBevel = wxJOIN_BEVEL
 
+fillRuleToWXFillRule :: FillRule -> Int
+fillRuleToWXFillRule Winding = wxWINDING_RULE
+fillRuleToWXFillRule EvenOdd = wxODDEVEN_RULE
+
 instance Backend WX R2 where
   data Render   WX R2 = C (RenderM ())
   type Result   WX R2 = IO ()
@@ -148,8 +154,15 @@ instance Backend WX R2 where
     liftIO $ graphicsMatrixDelete matrix
     let newStyle = oldStyle <> s
     wxApplyStyle newStyle
+    -- create a path that will be rendered with this style
+    nPath <- liftIO $ graphicsContextCreatePath context
     -- do the action
-    withReaderT (\s -> s {style = newStyle}) r
+    withReaderT (\s -> s {style = newStyle, graphicsPath = nPath}) r
+    -- render the path and delete it
+    liftIO $ graphicsContextDrawPath context nPath
+                    --get fillrule, take ODDEVEN if none given
+                    (maybe wxODDEVEN_RULE fillRuleToWXFillRule (getFillRule <$> getAttr s))
+    liftIO $ graphicsPathDelete nPath
     -- recreate the old state
     liftIO $ graphicsContextPopState context
     wxApplyStyle oldStyle
@@ -162,7 +175,7 @@ instance Backend WX R2 where
   doRender _ opts (C r) = do
     path <- graphicsContextCreatePath (optContext opts)
     runReaderT r (ReaderState path (optContext opts) mempty)
-    graphicsContextStrokePath (optContext opts) path
+    graphicsContextDrawPath (optContext opts) path wxODDEVEN_RULE
     graphicsPathDelete path
 
   adjustDia c opts d = if optBypassAdjust opts
@@ -215,11 +228,8 @@ instance Renderable (Trail R2) WX where
 instance Renderable (Path R2) WX where
   render _ (Path trs) = C $ do
     context <- graphicsContext <$> ask
-    nPath <- liftIO $ graphicsContextCreatePath context
-    withReaderT (\r -> r {graphicsPath = nPath}) $ mapM_ renderTrail trs
-    gc <- graphicsContext <$> ask
-    liftIO $ graphicsContextStrokePath gc nPath
-    liftIO $ graphicsPathDelete nPath
+    -- I am not sure if I should create a different path here or just use the existing one ...
+    mapM_ renderTrail trs
      where
       renderTrail (viewLoc -> (unp2 -> (px, py), tr)) = do
         path <- graphicsPath <$> ask
