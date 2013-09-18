@@ -53,7 +53,7 @@ import qualified Graphics.UI.WXCore.WxcTypes as WXT
 import Diagrams.Prelude
 import Diagrams.TwoD.Path              (Clip (..), getFillRule)
 import Diagrams.Attributes
-import Diagrams.TwoD.Adjust            (adjustDia2D,
+import Diagrams.TwoD.Adjust            (adjustDia2D, adjustDiaSize2D,
                                         setDefault2DAttributes)
 
 import Data.Typeable
@@ -180,9 +180,9 @@ instance Backend WX R2 where
 
   adjustDia c opts d = if optBypassAdjust opts
                          then (opts, transDia # setDefault2DAttributes)
-                         else adjustDia2D (\o -> let (w,h) = optSize o in mkSizeSpec (Just $ w) (Just $ h))
+                         else  adjustDiaSize2D (\o -> let (w,h) = optSize o in mkSizeSpec (Just $ w) (Just $ h))
                                           setWXSizeWithSizeSpec
-                                          c opts d
+                                          c opts (d # setDefault2DAttributes)
                           where
                            (optWidth, optHeight) = optSize opts
                            transDia = moveTo (p2 (optWidth/2.0, optHeight/2.0)) d
