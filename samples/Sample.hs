@@ -6,6 +6,7 @@ import Diagrams.Prelude hiding (start, text)
 import Diagrams.Backend.WX
 import Data.Maybe
 
+import qualified SquareLimit as SL
 
 main :: IO ()
 main = start gui
@@ -26,6 +27,7 @@ gui = do
     bypassAdjustDia <- get cb checked
     dia <- head <$> varGet dias
     putStrLn "OnPaint"
+    putStrLn $ "Diagram dimensions: " ++ show (width dia, height dia)
     renderToWindow sw bypassAdjustDia dia
   onpress dias sw = do
     varUpdate dias (\d -> tail d)
@@ -33,4 +35,5 @@ gui = do
 
 sampleDiagrams = [circle 100
                  ,circle 100 # lc purple # fc blue
-                 ,square 10] :: [Diagram WX R2]
+                 ,square 10 <> square 5
+                 ,SL.example] :: [Diagram WX R2]
