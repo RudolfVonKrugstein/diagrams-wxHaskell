@@ -228,12 +228,12 @@ instance Backend WX R2 where
 
   adjustDia c opts d = if optBypassAdjust opts
                          then (opts, transDia # setDefault2DAttributes)
-                         else  adjustDiaSize2D (\o -> let (w,h) = optSize o in mkSizeSpec (Just $ w) (Just $ h))
+                         else  adjustDia2D (\o -> let (w,h) = optSize o in mkSizeSpec (Just $ w) (Just $ h))
                                           setWXSizeWithSizeSpec
-                                          c opts (d # setDefault2DAttributes)
+                                          c opts (d # reflectY)
                           where
                            (optWidth, optHeight) = optSize opts
-                           transDia = moveTo (p2 (optWidth/2.0, optHeight/2.0)) d
+                           transDia = moveTo (p2 (optWidth/2.0, optHeight/2.0)) (d # reflectY)
                            setWXSizeWithSizeSpec s o = case s of
                              Absolute -> o
                              Width w  -> o {optSize = (w,w)}
