@@ -32,6 +32,7 @@ import Graphics.UI.WXCore (GraphicsPath
                           ,graphicsContextCreatePath
                           ,graphicsContextDrawPath
                           ,graphicsContextSetFont
+                          ,graphicsContextDrawText
                           ,wxODDEVEN_RULE
                           ,wxWINDING_RULE
                           ,graphicsPathGetCurrentPoint
@@ -212,10 +213,6 @@ instance Backend WX R2 where
     -- recreate the old state
     liftIO $ graphicsContextPopState context
     wxApplyStyle oldStyle
-     where
-      (unr2 -> (dx, dy)) = transl t
-      (unr2 -> (a , b )) = apply t unitX
-      (unr2 -> (c , d )) = apply t unitY
     
 
   doRender _ opts (C r) = do
@@ -294,3 +291,14 @@ instance Renderable (Path R2) WX where
         path <- graphicsPath <$> ask
         liftIO $ graphicsPathMoveToPoint path (Point px py)
         renderC tr
+
+instance Renderable Text WX where
+  render _ (Text tr al str) = C $ do
+    -- | the alignment parameter is not yet supported, text is always aligned to the baseline
+    context <- graphicsContext <$> ask
+    -- apply local transformation
+    liftIO $ graphicsContextPushState context
+    liftIO $ graphicsContextApplyTransformation context tr
+    liftIO $ graphicsContextDrawText context str (Point 0.0 0.0)
+    -- restore transformation
+    liftIO $ graphicsContextPopState context
