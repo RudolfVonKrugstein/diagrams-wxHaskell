@@ -22,3 +22,14 @@ Library
                        wx,
                        wxcore
 
+Executable             diagramsWxHaskell-Sample
+  Hs-source-dirs:      samples
+  Main-is:             Sample.hs
+  Other-modules:       SquareLimit
+  Build-depends:       base >= 4.2 && < 4.7,
+                       diagrams-wxHaskell,
+                       diagrams-core >= 0.7 && < 0.8,
+                       diagrams-lib >= 0.7 && < 0.8,
+                       split,
+                       wx,
+                       wxcore
