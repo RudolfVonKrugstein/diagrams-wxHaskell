@@ -31,6 +31,7 @@ import Graphics.UI.WXCore (GraphicsPath
                           ,graphicsContextConcatTransform
                           ,graphicsContextCreatePath
                           ,graphicsContextDrawPath
+                          ,graphicsContextSetFont
                           ,wxODDEVEN_RULE
                           ,wxWINDING_RULE
                           ,graphicsPathGetCurrentPoint
@@ -48,6 +49,22 @@ import Graphics.UI.WXCore (GraphicsPath
                           ,wxJOIN_MITER
                           ,wxJOIN_ROUND
                           ,wxJOIN_BEVEL
+                          ,fontCreateDefault
+                          ,fontSetStyle
+                          ,fontSetWeight
+                          ,fontSetPointSize
+                          ,fontSetFamily
+                          ,fontDelete
+                          ,wxNORMAL
+                          ,wxITALIC
+                          ,wxSLANT
+                          ,wxBOLD
+                          ,wxDECORATIVE
+                          ,wxROMAN 	
+                          ,wxSCRIPT
+                          ,wxSWISS 	
+                          ,wxMODERN 	
+                          ,wxTELETYPE 	
                           )
 import qualified Graphics.UI.WXCore.WxcTypes as WXT
 import Diagrams.Prelude
@@ -55,7 +72,7 @@ import Diagrams.TwoD.Path              (Clip (..), getFillRule)
 import Diagrams.Attributes
 import Diagrams.TwoD.Adjust            (adjustDia2D, adjustDiaSize2D,
                                         setDefault2DAttributes)
-
+import Diagrams.TwoD.Text
 import Data.Typeable
 import Data.Maybe
 
@@ -91,31 +108,44 @@ colorToWXColor s c = WXT.rgba (round (r * 255.0)) (round (g * 255.0)) (round (b 
 wxApplyStyle :: Style v -> RenderM ()
 wxApplyStyle s = do
   context <- graphicsContext <$> ask
-  -- create default pen and brush
+  -- create default pen, brush and font
   liftIO $ do
     pen <- penCreateDefault
     brush <- brushCreateDefault
+    font  <- fontCreateDefault
     -- apply styles to it
     sequence_ . catMaybes $ [
         handle (lineColor pen)
       , handle (fillColor brush)
       , handle (lineWidth pen)
+      , handle (lineCap pen)
+      , handle (lineJoin pen)
+      , handle (fontSize font)
+      , handle (fontSlant font)
+      , handle (fontWeight font)
+      , handle (fontFamily font)
       ]
-    -- apply and delete pen and brush
+    -- apply and delete pen and brush and font
     graphicsContextSetPen context pen
     graphicsContextSetBrush context brush
+    graphicsContextSetFont context font (WXT.rgba 0 0 0 255)
     brushDelete brush
     penDelete pen
+    fontDelete font
   return ()
     where
      handle :: AttributeClass a => (a -> IO ()) -> Maybe (IO ())
      handle f = f `fmap` getAttr s
      clip context  = undefined
-     lineColor pen   = penSetColour pen     . (colorToWXColor s) <$> getLineColor
-     fillColor brush = brushSetColour brush . (colorToWXColor s) <$> getFillColor
-     lineWidth pen   = penSetWidth pen . lineWidthToWXLineWidth <$> getLineWidth
-     lineCap   pen   = penSetCap  pen . lineCapToWXLineCap      <$> getLineCap
-     lineJoin  pen   = penSetJoin pen . lineJoinToWXLineJoin    <$> getLineJoin
+     lineColor pen   = penSetColour pen     . (colorToWXColor s)     <$> getLineColor
+     fillColor brush = brushSetColour brush . (colorToWXColor s)     <$> getFillColor
+     lineWidth pen   = penSetWidth pen . lineWidthToWXLineWidth      <$> getLineWidth
+     lineCap   pen   = penSetCap  pen . lineCapToWXLineCap           <$> getLineCap
+     lineJoin  pen   = penSetJoin pen . lineJoinToWXLineJoin         <$> getLineJoin
+     fontSize  font  = fontSetPointSize font . round                 <$> getFontSize
+     fontSlant font  = fontSetStyle font . fontSlantToWXFontSlant    <$> getFontSlant
+     fontWeight font = fontSetWeight font . fontWeightToWXFontWeight <$> getFontWeight
+     fontFamily font = fontSetFamily font . fontFamilyToWXFontFamily <$> getFont
 
 -- | wxHaskell pens only take integer width. So we have to round the pen width
 --   to the nearest integer. But we do not want to round number < 0.5 to 0, but to 1
@@ -136,6 +166,24 @@ lineJoinToWXLineJoin LineJoinBevel = wxJOIN_BEVEL
 fillRuleToWXFillRule :: FillRule -> Int
 fillRuleToWXFillRule Winding = wxWINDING_RULE
 fillRuleToWXFillRule EvenOdd = wxODDEVEN_RULE
+
+fontSlantToWXFontSlant :: FontSlant -> Int
+fontSlantToWXFontSlant FontSlantNormal  = wxNORMAL
+fontSlantToWXFontSlant FontSlantItalic  = wxITALIC
+fontSlantToWXFontSlant FontSlantOblique = wxSLANT
+
+fontWeightToWXFontWeight :: FontWeight -> Int
+fontWeightToWXFontWeight FontWeightNormal = wxNORMAL
+fontWeightToWXFontWeight FontWeightBold   = wxBOLD
+
+fontFamilyToWXFontFamily :: String -> Int
+fontFamilyToWXFontFamily "DECORATIVE" = wxDECORATIVE
+fontFamilyToWXFontFamily "ROMAN"      = wxROMAN 	
+fontFamilyToWXFontFamily "SCRIPT"     = wxSCRIPT
+fontFamilyToWXFontFamily "SWISS"      = wxSWISS 	
+fontFamilyToWXFontFamily "MODERN"     = wxMODERN 	
+fontFamilyToWXFontFamily "TELETYPE"   = wxTELETYPE
+fontFamilyToWXFontFamily _            = wxNORMAL
 
 instance Backend WX R2 where
   data Render   WX R2 = C (RenderM ())
