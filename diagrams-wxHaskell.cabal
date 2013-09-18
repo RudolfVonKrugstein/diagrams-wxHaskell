@@ -25,11 +25,12 @@ Library
 Executable             diagramsWxHaskell-Sample
   Hs-source-dirs:      samples
   Main-is:             Sample.hs
-  Other-modules:       SquareLimit
+  Other-modules:       SquareLimit, Chart
   Build-depends:       base >= 4.2 && < 4.7,
                        diagrams-wxHaskell,
                        diagrams-core >= 0.7 && < 0.8,
                        diagrams-lib >= 0.7 && < 0.8,
+                       SVGFonts,
                        split,
                        wx,
                        wxcore

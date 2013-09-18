@@ -7,6 +7,7 @@ import Diagrams.Backend.WX
 import Data.Maybe
 
 import qualified SquareLimit as SL
+import qualified Chart as CH
 
 main :: IO ()
 main = start gui
@@ -36,4 +37,5 @@ gui = do
 sampleDiagrams = [circle 100
                  ,circle 100 # lc purple # fc blue
                  ,square 10 <> square 5
-                 ,SL.example] :: [Diagram WX R2]
+                 ,SL.example
+                 ,CH.example] :: [Diagram WX R2]
