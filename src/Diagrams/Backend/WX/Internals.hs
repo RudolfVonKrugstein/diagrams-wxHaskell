@@ -28,7 +28,6 @@ import Graphics.UI.WXCore (GraphicsPath
                           ,graphicsContextSetBrush
                           ,graphicsContextPushState
                           ,graphicsContextPopState
-                          ,graphicsContextConcatTransform
                           ,graphicsContextCreatePath
                           ,graphicsContextDrawPath
                           ,graphicsContextSetFont
@@ -41,9 +40,6 @@ import Graphics.UI.WXCore (GraphicsPath
                           ,graphicsPathMoveToPoint
                           ,graphicsPathCloseSubpath
                           ,graphicsPathDelete
-                          ,graphicsContextCreateMatrix
-                          ,graphicsMatrixSet
-                          ,graphicsMatrixDelete
                           ,wxCAP_BUTT
                           ,wxCAP_ROUND
                           ,wxCAP_PROJECTING
@@ -195,10 +191,7 @@ instance Backend WX R2 where
 
   withStyle _ s t (C r) = C $ do
     ReaderState path context oldStyle <- ask
-    -- remember/push the old state
-    liftIO $ graphicsContextPushState context
     -- apply the style
-    liftIO $ graphicsContextApplyTransformation context t
     let newStyle = oldStyle <> s
     wxApplyStyle newStyle
     -- create a path that will be rendered with this style
@@ -208,10 +201,8 @@ instance Backend WX R2 where
     -- render the path and delete it
     liftIO $ graphicsContextDrawPath context nPath
                     --get fillrule, take ODDEVEN if none given
-                    (maybe wxODDEVEN_RULE fillRuleToWXFillRule (getFillRule <$> getAttr s))
+                    (maybe wxODDEVEN_RULE fillRuleToWXFillRule (getFillRule <$> getAttr newStyle))
     liftIO $ graphicsPathDelete nPath
-    -- recreate the old state
-    liftIO $ graphicsContextPopState context
     wxApplyStyle oldStyle
     
 
@@ -234,19 +225,6 @@ instance Backend WX R2 where
                              Width w  -> o {optSize = (w,w)}
                              Height h -> o {optSize = (h,h)}
                              Dims w h -> o {optSize = (w,h)}
-
--- Apply transformation by Matrix
-graphicsContextApplyTransformation :: GraphicsContext a -> T2 -> IO ()
-graphicsContextApplyTransformation context t = do
-    matrix <- liftIO $ graphicsContextCreateMatrix context a b c d dx dy
-    liftIO $ putStrLn $ "Matrix: " ++ show ((a,b), (c,d))
-    --liftIO $ graphicsContextConcatTransform context matrix
-    liftIO $ graphicsMatrixDelete matrix
-     where
-      (unr2 -> (dx, dy)) = transl t
-      (unr2 -> (a , b )) = apply t unitX
-      (unr2 -> (c , d )) = apply t unitY
-
 
 -- Draw a relative line
 graphicsPathAddRelLine :: GraphicsPath a -> (Point2 Double) -> IO ()
@@ -298,7 +276,6 @@ instance Renderable Text WX where
     context <- graphicsContext <$> ask
     -- apply local transformation
     liftIO $ graphicsContextPushState context
-    liftIO $ graphicsContextApplyTransformation context tr
     liftIO $ graphicsContextDrawText context str (Point 0.0 0.0)
     -- restore transformation
     liftIO $ graphicsContextPopState context
