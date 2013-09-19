@@ -21,6 +21,9 @@ import Graphics.UI.WXCore (GraphicsPath
                           ,penSetWidth
                           ,penSetJoin
                           ,penSetCap
+                          ,penSetDashes
+                          ,penSetStyle
+                          ,wxUSER_DASH
                           ,graphicsContextSetPen
                           ,brushCreateDefault
                           ,brushSetColour
@@ -72,6 +75,9 @@ import Diagrams.TwoD.Adjust            (adjustDia2D, adjustDiaSize2D,
 import Diagrams.TwoD.Text
 import Data.Typeable
 import Data.Maybe
+import Data.Word
+import qualified Data.Bits as B
+import qualified Data.Vector.Storable as SV
 
 -- | This datatype serves as a tag to indentify the wxHaskell backend
 data WX = WX
@@ -192,6 +198,55 @@ fontFamilyToWXFontFamily "SWISS"      = wxSWISS
 fontFamilyToWXFontFamily "MODERN"     = wxMODERN 	
 fontFamilyToWXFontFamily "TELETYPE"   = wxTELETYPE
 fontFamilyToWXFontFamily _            = wxNORMAL
+
+-- |Dashing for WX. Since a bit pattern must be made out of it, its a dashing of 
+--  Int length. The boolean indicates, if it starts with an on or off dash.
+data WXDashing = WXDashing Bool [Int]
+
+-- | Prepares the dashing by:
+--   * Removing the offset
+--   * Applying the scale
+--   * Round the dashings. This does not preserve the total length, but preserves symmetry
+dashingPrepare :: Double -> Bool -> Dashing -> WXDashing
+dashingPrepare scale startWithOn (Dashing ds offset)
+  | offset == 0.0     = WXDashing startWithOn $ map (round . (*scale)) ds -- base case, offset already removed
+  | offset == head ds = dashingPrepare scale (not startWithOn) (Dashing (moveFirstDashBack ds) 0.0) -- remove offset in one step
+  | offset  < head ds = dashingPrepare scale startWithOn       (Dashing (applyOffsetToFirst offset ds) 0.0)
+  | otherwise         = dashingPrepare scale (not startWithOn) (Dashing (moveFirstDashBack ds) (offset - head ds))
+   where
+    numDashes = length ds
+    applyOffsetToFirst :: Double -> [Double] -> [Double]
+    applyOffsetToFirst offset (d:ds) = if odd numDashes
+                                       then (d-offset):(init ds) ++ [(last ds + offset)] --first and last are of same type
+                                       else (d-offset):ds ++ [offset]                  --first and last are of different type
+    moveFirstDashBack :: [Double] -> [Double]
+    moveFirstDashBack (d:ds) = if odd numDashes
+                               then (init ds) ++ [(last ds + d)]
+                               else ds ++ [d]
+
+-- | In wxHaskell dashes are done by providing a bit muster
+--   So we have to create the bit muster and pass it to the pen.
+--   wxHaskell expects an array with the bit muster, we use Vector.Storable for that.
+applyDashingToWXPen :: Pen a -> WXDashing -> IO ()
+applyDashingToWXPen pen (WXDashing startWithOn dashing) = do
+  -- total length of dashing to create array
+  let numBits = sum $ dashing
+      bits   = concat $ zipWith replicate dashing (alternating startWithOn)
+      muster = makeBitMuster bits
+  SV.unsafeWith (SV.fromList muster :: SV.Vector Word) (penSetDashes pen numBits)
+  penSetStyle pen wxUSER_DASH
+   where
+     alternating :: Bool -> [Bool]
+     alternating init = init : (alternating . not $ init)
+     maySetBit :: (Bool,Int) -> Word -> Word
+     maySetBit (doit,pos) = if doit then ((B..|.) (1 `B.shift` pos)) else id
+     bitsToWord :: [Bool] -> Word
+     bitsToWord bs = foldl (flip maySetBit) (0 :: Word) (zip bs [0..31])
+     makeBitMuster :: [Bool] -> [Word]
+     makeBitMuster [] = []
+     makeBitMuster bs = (bitsToWord . take 32 $ bs) : makeBitMuster (drop 32 bs)
+    
+
 
 instance Backend WX R2 where
   data Render   WX R2 = C (RenderM ())
