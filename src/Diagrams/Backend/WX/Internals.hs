@@ -73,13 +73,15 @@ import Diagrams.TwoD.Text
 import Data.Typeable
 import Data.Maybe
 
+-- | This datatype serves as a tag to indentify the wxHaskell backend
 data WX = WX
   deriving (Eq,Ord,Read,Show,Typeable)
 
 data ReaderState = ReaderState
                    { graphicsPath    :: GraphicsPath ()
                    , graphicsContext :: GraphicsContext ()
-                   , style           :: Style R2 -- the style currently applied.
+                   , style           :: Style R2            -- ^ the style currently applied.
+                   , transformation  :: Transformation R2   -- ^ The transformation applied to the style
                    }
 
 instance Monoid (Render WX R2) where
@@ -102,8 +104,8 @@ colorToWXColor s c = WXT.rgba (round (r * 255.0)) (round (g * 255.0)) (round (b 
                   Just  d -> d * a
 
 -- | Apply all the styles
-wxApplyStyle :: Style v -> RenderM ()
-wxApplyStyle s = do
+wxApplyStyle :: Style R2 -> Transformation R2 -> RenderM ()
+wxApplyStyle s t = do
   context <- graphicsContext <$> ask
   -- create default pen, brush and font
   liftIO $ do
@@ -121,6 +123,7 @@ wxApplyStyle s = do
       , handle (fontSlant font)
       , handle (fontWeight font)
       , handle (fontFamily font)
+      , handle (lineDashing pen)
       ]
     -- apply and delete pen and brush and font
     graphicsContextSetPen context pen
@@ -131,18 +134,26 @@ wxApplyStyle s = do
     fontDelete font
   return ()
     where
+     -- the transformation scales some attributes (becuase we can not apply a complexer transformation to it)
+     -- For the scale we take the average of the eigenvalues 
+     (unr2 -> (a, b)) = apply t unitX
+     (unr2 -> (c, d)) = apply t unitY
+     determinant = a*d - b*c
+     scale = sqrt . abs $ determinant -- this def. on the scale has been suggested in this email: https://groups.google.com/forum/#!topic/diagrams-discuss/IsBD8FRnC3E
+
      handle :: AttributeClass a => (a -> IO ()) -> Maybe (IO ())
      handle f = f `fmap` getAttr s
      clip context  = undefined
-     lineColor pen   = penSetColour pen     . (colorToWXColor s)     <$> getLineColor
-     fillColor brush = brushSetColour brush . (colorToWXColor s)     <$> getFillColor
-     lineWidth pen   = penSetWidth pen . lineWidthToWXLineWidth      <$> getLineWidth
-     lineCap   pen   = penSetCap  pen . lineCapToWXLineCap           <$> getLineCap
-     lineJoin  pen   = penSetJoin pen . lineJoinToWXLineJoin         <$> getLineJoin
-     fontSize  font  = fontSetPointSize font . round                 <$> getFontSize
-     fontSlant font  = fontSetStyle font . fontSlantToWXFontSlant    <$> getFontSlant
-     fontWeight font = fontSetWeight font . fontWeightToWXFontWeight <$> getFontWeight
-     fontFamily font = fontSetFamily font . fontFamilyToWXFontFamily <$> getFont
+     lineColor pen   = penSetColour pen     . (colorToWXColor s)            <$> getLineColor
+     fillColor brush = brushSetColour brush . (colorToWXColor s)            <$> getFillColor
+     lineWidth pen   = penSetWidth pen . lineWidthToWXLineWidth . (* scale) <$> getLineWidth
+     lineCap   pen   = penSetCap  pen . lineCapToWXLineCap                  <$> getLineCap
+     lineJoin  pen   = penSetJoin pen . lineJoinToWXLineJoin                <$> getLineJoin
+     lineDashing pen = applyDashingToWXPen pen . dashingPrepare scale True  <$> getDashing
+     fontSize  font  = fontSetPointSize font . round            . (* scale) <$> getFontSize
+     fontSlant font  = fontSetStyle font . fontSlantToWXFontSlant           <$> getFontSlant
+     fontWeight font = fontSetWeight font . fontWeightToWXFontWeight        <$> getFontWeight
+     fontFamily font = fontSetFamily font . fontFamilyToWXFontFamily        <$> getFont
 
 -- | wxHaskell pens only take integer width. So we have to round the pen width
 --   to the nearest integer. But we do not want to round number < 0.5 to 0, but to 1
@@ -190,25 +201,26 @@ instance Backend WX R2 where
                                   ,optBypassAdjust :: Bool}
 
   withStyle _ s t (C r) = C $ do
-    ReaderState path context oldStyle <- ask
-    -- apply the style
+    ReaderState path context oldStyle oldTrans <- ask
+    -- apply the style and transformation
     let newStyle = oldStyle <> s
-    wxApplyStyle newStyle
+        newTrans = oldTrans <> t
+    wxApplyStyle newStyle newTrans
     -- create a path that will be rendered with this style
     nPath <- liftIO $ graphicsContextCreatePath context
     -- do the action
-    withReaderT (\s -> s {style = newStyle, graphicsPath = nPath}) r
+    withReaderT (\s -> s {style = newStyle, transformation = newTrans, graphicsPath = nPath}) r
     -- render the path and delete it
     liftIO $ graphicsContextDrawPath context nPath
                     --get fillrule, take ODDEVEN if none given
                     (maybe wxODDEVEN_RULE fillRuleToWXFillRule (getFillRule <$> getAttr newStyle))
     liftIO $ graphicsPathDelete nPath
-    wxApplyStyle oldStyle
+    wxApplyStyle oldStyle oldTrans
     
 
   doRender _ opts (C r) = do
     path <- graphicsContextCreatePath (optContext opts)
-    runReaderT r (ReaderState path (optContext opts) mempty)
+    runReaderT r (ReaderState path (optContext opts) mempty mempty)
     graphicsContextDrawPath (optContext opts) path wxODDEVEN_RULE
     graphicsPathDelete path
 
