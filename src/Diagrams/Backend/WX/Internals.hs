@@ -24,6 +24,7 @@ import Graphics.UI.WXCore (GraphicsPath
                           ,penSetColour
                           ,penDelete
                           ,penSetWidth
+                          ,penGetWidth
                           ,penSetJoin
                           ,penSetCap
                           ,penSetDashes
@@ -161,7 +162,7 @@ wxApplyStyle s t = do
      lineWidth pen   = penSetWidth pen . lineWidthToWXLineWidth . (* scale) <$> getLineWidth
      lineCap   pen   = penSetCap  pen . lineCapToWXLineCap                  <$> getLineCap
      lineJoin  pen   = penSetJoin pen . lineJoinToWXLineJoin                <$> getLineJoin
-     lineDashing pen = applyDashingToWXPen pen . dashingPrepare scale True  <$> getDashing
+     lineDashing pen = applyDashingToWXPen pen scale . dashingPrepare True  <$> getDashing
      fontSize  font  = fontSetPointSize font . round            . (* scale) <$> getFontSize
      fontSlant font  = fontSetStyle font . fontSlantToWXFontSlant           <$> getFontSlant
      fontWeight font = fontSetWeight font . fontWeightToWXFontWeight        <$> getFontWeight
@@ -205,20 +206,17 @@ fontFamilyToWXFontFamily "MODERN"     = wxMODERN
 fontFamilyToWXFontFamily "TELETYPE"   = wxTELETYPE
 fontFamilyToWXFontFamily _            = wxNORMAL
 
--- |Dashing for WX. Since a bit pattern must be made out of it, its a dashing of 
---  Int length. The boolean indicates, if it starts with an on or off dash.
-data WXDashing = WXDashing Bool [Int]
+-- |Dashing for WX. No offset can be used. The boolean indicates, if it starts with an on or off dash.
+data NoOffsetDashing = NoOffsetDashing Bool [Double]
 
 -- | Prepares the dashing by:
 --   * Removing the offset
---   * Applying the scale
---   * Round the dashings. This does not preserve the total length, but preserves symmetry
-dashingPrepare :: Double -> Bool -> Dashing -> WXDashing
-dashingPrepare scale startWithOn (Dashing ds offset)
-  | offset == 0.0     = WXDashing startWithOn $ map (round . (*scale)) ds -- base case, offset already removed
-  | offset == head ds = dashingPrepare scale (not startWithOn) (Dashing (moveFirstDashBack ds) 0.0) -- remove offset in one step
-  | offset  < head ds = dashingPrepare scale startWithOn       (Dashing (applyOffsetToFirst offset ds) 0.0)
-  | otherwise         = dashingPrepare scale (not startWithOn) (Dashing (moveFirstDashBack ds) (offset - head ds))
+dashingPrepare :: Bool -> Dashing -> NoOffsetDashing
+dashingPrepare startWithOn (Dashing ds offset)
+  | offset == 0.0     = NoOffsetDashing startWithOn ds -- base case, offset already removed
+  | offset == head ds = dashingPrepare (not startWithOn) (Dashing (moveFirstDashBack ds) 0.0) -- remove offset in one step
+  | offset  < head ds = dashingPrepare startWithOn       (Dashing (applyOffsetToFirst offset ds) 0.0)
+  | otherwise         = dashingPrepare (not startWithOn) (Dashing (moveFirstDashBack ds) (offset - head ds))
    where
     numDashes = length ds
     applyOffsetToFirst :: Double -> [Double] -> [Double]
@@ -230,35 +228,29 @@ dashingPrepare scale startWithOn (Dashing ds offset)
                                then (init ds) ++ [(last ds + d)]
                                else ds ++ [d]
 
--- | In wxHaskell dashes are done by providing a bit muster
---   So we have to create the bit muster and pass it to the pen.
---   wxHaskell expects an array with the bit muster, we use Vector.Storable for that.
-applyDashingToWXPen :: Pen a -> WXDashing -> IO ()
-applyDashingToWXPen pen (WXDashing startWithOn dashing) = do
-  -- total length of dashing to create array
-  let numBits = sum $ dashing
-      bits   = concat $ zipWith replicate dashing (alternating startWithOn)
-      muster = makeBitMuster bits
-  varSet storedDashes (SV.fromList muster)
-  varGet storedDashes >>= \v -> SV.unsafeWith v (penSetDashes pen numBits)
+-- | In wxHaskell dashes are done by providing an array of Word8. This array must be valid
+--   even after setting it.
+--   So we have to create a vector and store the array in there. The array is sotred in "storedDashes" and preserved even after this
+--   function finished until it is called the next time.
+--   This function relies on the pen size, so it must be called after the pen size has been set.
+applyDashingToWXPen :: Pen a -> Double -> NoOffsetDashing -> IO ()
+applyDashingToWXPen pen scale (NoOffsetDashing startWithOn dashing) = do
+  penSize <- penGetWidth pen
+  let dashing' = if startWithOn then dashing else (0.0):dashing -- prepare for the "start with on ==False"
+      num    = length dashing
+      values :: [Word8]
+      values = map (round . ((*) (scale/fromIntegral penSize))) $ dashing'
+  varSet storedDashes (SV.fromList values)
+  varGet storedDashes >>= \v -> SV.unsafeWith v (penSetDashes pen num)
+  varGet storedDashes >>= \v -> putStrLn $ "Dashes: " ++ show v ++ ", Bits:" ++ show num
   penSetStyle pen wxUSER_DASH
-   where
-     alternating :: Bool -> [Bool]
-     alternating init = init : (alternating . not $ init)
-     maySetBit :: (Bool,Int) -> Word -> Word
-     maySetBit (doit,pos) = if doit then ((B..|.) (1 `B.shift` pos)) else id
-     bitsToWord :: [Bool] -> Word
-     bitsToWord bs = foldl (flip maySetBit) (0 :: Word) (zip bs [0..31])
-     makeBitMuster :: [Bool] -> [Word]
-     makeBitMuster [] = []
-     makeBitMuster bs = (bitsToWord . take 32 $ bs) : makeBitMuster (drop 32 bs)
    
 -- | The dashes set to a pen require that the given array is preserved as long as the pen exists
 --   For this reaseon we save the vector (that is storing the dahses) in this IO var. This way the array
 --   (the array in the vector) is preserved until the next time applyDashingToWxPen is called and the pointer
 --   that has been passed to penSetDashaes is saved
 --   For this we use the "Top level mutable state" hack (http://www.haskell.org/haskellwiki/Top_level_mutable_state)
-storedDashes :: Var (SV.Vector Word)
+storedDashes :: Var (SV.Vector Word8)
 {-# NOINLINE storedDashes #-}
 storedDashes = unsafePerformIO (varCreate (SV.fromList []))
 
