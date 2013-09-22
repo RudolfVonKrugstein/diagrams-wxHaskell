@@ -8,7 +8,6 @@
 {-# LANGUAGE FlexibleInstances         #-}
 
 module Diagrams.Backend.WX.Internals where
-
 import Control.Monad.Reader
 import Graphics.UI.WX (Point2(..)
                       ,varCreate
@@ -242,7 +241,6 @@ applyDashingToWXPen pen scale (NoOffsetDashing startWithOn dashing) = do
       values = map (round . ((*) (scale/fromIntegral penSize))) $ dashing'
   varSet storedDashes (SV.fromList values)
   varGet storedDashes >>= \v -> SV.unsafeWith v (penSetDashes pen num)
-  varGet storedDashes >>= \v -> putStrLn $ "Dashes: " ++ show v ++ ", Bits:" ++ show num
   penSetStyle pen wxUSER_DASH
    
 -- | The dashes set to a pen require that the given array is preserved as long as the pen exists
