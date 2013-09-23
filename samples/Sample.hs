@@ -3,6 +3,7 @@ module Main where
 import Graphics.UI.WXCore hiding ((#),blue,purple)
 import Graphics.UI.WX hiding (circle,(#),blue,purple)
 import Diagrams.Prelude hiding (start, text)
+import qualified Diagrams.Prelude as DP
 import Diagrams.Backend.WX
 import Data.Maybe
 
@@ -35,7 +36,9 @@ gui = do
     repaint sw
 
 sampleDiagrams = [circle 100
-                 ,circle 100 # lc purple # fc blue
-                 ,square 10 <> square 5
+                 ,circle 100 # lc purple # fc blue 
+                 ,DP.text "Hello World" # DP.font "ROMAN" # fc DP.black # DP.fontSize 20
+                 ,DP.text "Hello Rotated World" # DP.font "ROMAN" # fc DP.black # DP.fontSize 10 # DP.rotateBy (1/3)
+                 ,square 10 <> square 5 # DP.rotateBy (1/3)
                  ,SL.example
                  ,CH.example] :: [Diagram WX R2]
