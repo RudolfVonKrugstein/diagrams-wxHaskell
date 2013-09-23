@@ -40,6 +40,7 @@ import Graphics.UI.WXCore (GraphicsPath
                           ,graphicsContextDrawPath
                           ,graphicsContextSetFont
                           ,graphicsContextDrawText
+                          ,graphicsContextDrawTextWithAngle
                           ,wxODDEVEN_RULE
                           ,wxWINDING_RULE
                           ,graphicsPathGetCurrentPoint
@@ -347,7 +348,8 @@ instance Renderable Text WX where
     -- | the alignment parameter is not yet supported, text is always aligned to the baseline
     context <- graphicsContext <$> ask
     -- apply local transformation
-    liftIO $ graphicsContextPushState context
-    liftIO $ graphicsContextDrawText context str (Point 0.0 0.0)
-    -- restore transformation
-    liftIO $ graphicsContextPopState context
+    liftIO $ graphicsContextDrawTextWithAngle context str (Point tx ty) rotation
+     where
+      (unr2 -> (tx,ty)) = transl tr
+      (unr2 -> (ax,ay)) = apply tr unitX
+      rotation = atan2 ay ax
